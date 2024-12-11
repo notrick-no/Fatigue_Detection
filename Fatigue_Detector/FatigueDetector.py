@@ -48,7 +48,8 @@ parser.add_argument('--keep_top_k', default=750, type=int, help='keep_top_k')
 parser.add_argument('--save_image', action="store_true", default=True, help='show detection results')
 parser.add_argument('--vis_thres', default=0.6, type=float, help='visualization_threshold')
 args = parser.parse_args()
-
+#这个 check_keys 函数用于比较模型的 state_dict 和预训练模型的 state_dict 中的键（key），并检查它们是否匹配。它会输出缺失的键、未使用的键和
+# 已经使用的键的数量，帮助您判断模型和预训练权重之间是否有不匹配的地方。
 def check_keys(model, pretrained_state_dict):
     ckpt_keys = set(pretrained_state_dict.keys())
     model_keys = set(model.state_dict().keys())
@@ -61,14 +62,17 @@ def check_keys(model, pretrained_state_dict):
     assert len(used_pretrained_keys) > 0, 'load NONE from pretrained checkpoint'
     return True
 
-
+#remove_prefix 函数的作用是从模型的 state_dict 中移除参数名的前缀（通常是 "module."），这在加载分布式训练或多GPU训练保存的模型权重时非常有用。
+#使用 PyTorch 的 torch.nn.DataParallel 进行多GPU训练时，模型的 state_dict 中保存的参数（如权重、偏置等）会自动加上前缀 'module.'
+#为了使这些参数在单GPU环境或没有 DataParallel 的环境中能够正确加载，通常需要去掉这些多余的 'module.' 前缀。
 def remove_prefix(state_dict, prefix):
     ''' Old style model is stored with all names of parameters sharing common prefix 'module.' '''
     print('remove prefix \'{}\''.format(prefix))
     f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
     return {f(key): value for key, value in state_dict.items()}
 
-
+#这个 load_model 函数用于加载预训练模型的权重，并根据是否将模型加载到 CPU 或 GPU 来调整模型的加载方式。
+#返回加载了预训练权重的模型。
 def load_model(model, pretrained_path, load_to_cpu):
     print('Loading pretrained model from {}'.format(pretrained_path))
     if load_to_cpu:
@@ -84,8 +88,9 @@ def load_model(model, pretrained_path, load_to_cpu):
     model.load_state_dict(pretrained_dict, strict=False)
     return model
 
-class Fatigue_detecting(wx.Frame):
 
+class Fatigue_detecting(wx.Frame):
+    #使用 wxPython 创建图形界面应用程序的代码，主要用于视频流疲劳检测，包括打哈欠、闭眼、离位等功能
     def __init__( self, parent, title ):
         wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = title, pos = wx.DefaultPosition, size = wx.Size( 873,535 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
                 
@@ -190,15 +195,20 @@ class Fatigue_detecting(wx.Frame):
         self.mask = False
         self.k = 0
 
+
+   #在 Python 中，__del__ 是一个特殊方法，通常用于对象销毁时的清理工作。它在对象被销毁之前自动调用，类似于其他语言中的析构函数（destructor）
     def __del__( self ):
         pass
 
-
     def _learning_face(self,event):
+        #关闭自动梯度计算
         torch.set_grad_enabled(False)
 
         cfg = None
         net = None
+        #这段代码通过检查命令行传入的 args.network 参数来选择适当的神经网络模型。
+        #每个网络结构对应一个配置文件（如 cfg_mnet、cfg_slim、cfg_rfb），并且根据选定的网络类型初始化相应的模型（如 RetinaFace、Slim、RFB）。
+        #如果传入的网络类型不在预期范围内，程序会输出错误并退出。
         if args.network == "mobile0.25":
             cfg = cfg_mnet
             net = RetinaFace(cfg = cfg, phase = 'test')
@@ -211,7 +221,12 @@ class Fatigue_detecting(wx.Frame):
         else:
             print("Don't support network!")
             exit(0)
-
+        #载预训练模型权重（通过 load_model 函数）。
+        #设置模型为评估模式（eval()），以关闭 dropout 和 batch normalization 等训练时特有的行为。
+        #打印模型结构以及模型加载完成的提示信息。
+        #启用 cuDNN 优化，提升 GPU 上卷积操作的性能（适用于固定输入大小的模型）。
+        #根据 args.cpu 参数选择设备（CPU 或 GPU）。
+        #将模型移动到选定的计算设备上。
         net = load_model(net, args.trained_model, args.cpu)
         net.eval()
         print('Finished loading model!')
@@ -260,14 +275,14 @@ class Fatigue_detecting(wx.Frame):
 
                 img = np.float32(img_raw)
 
-                # testing scale
+                # 测试缩放比
                 target_size = args.long_side
                 max_size = args.long_side
                 im_shape = img.shape
                 im_size_min = np.min(im_shape[0:2])
                 im_size_max = np.max(im_shape[0:2])
                 resize = float(target_size) / float(im_size_min)
-                # prevent bigger axis from being more than max_size:
+                # 防止更大的轴超过最大尺寸:
                 if np.round(resize * im_size_max) > max_size:
                     resize = float(max_size) / float(im_size_max)
                 if args.origin_size:
@@ -277,7 +292,7 @@ class Fatigue_detecting(wx.Frame):
                     img = cv2.resize(img, None, None, fx=resize, fy=resize, interpolation=cv2.INTER_LINEAR)
                 im_height, im_width, _ = img.shape
 
-
+                #图像归一化和转换为张量
                 scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
                 img -= (104, 117, 123)
                 img = img.transpose(2, 0, 1)
@@ -285,10 +300,12 @@ class Fatigue_detecting(wx.Frame):
                 img = img.to(device)
                 scale = scale.to(device)
 
+                #向前传播
                 tic = time.time()
-                loc, conf, landms = net(img)  # forward pass
+                loc, conf, landms = net(img)
                 #print('net forward time: {:.4f}'.format(time.time() - tic))
 
+                #生成锚框和解码
                 priorbox = PriorBox(cfg, image_size=(im_height, im_width))
                 priors = priorbox.forward()
                 priors = priors.to(device)
@@ -297,6 +314,7 @@ class Fatigue_detecting(wx.Frame):
                 boxes = boxes * scale / resize
                 boxes = boxes.cpu().numpy()
                 scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
+                #解码关键点
                 landms = decode_landm(landms.data.squeeze(0), prior_data, cfg['variance'])
                 scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
                                        img.shape[3], img.shape[2], img.shape[3], img.shape[2],
@@ -305,13 +323,13 @@ class Fatigue_detecting(wx.Frame):
                 landms = landms * scale1 / resize
                 landms = landms.cpu().numpy()
 
-                # ignore low scores
+                # ignore low scores筛选低置信度的框
                 inds = np.where(scores > args.confidence_threshold)[0]
                 boxes = boxes[inds]
                 landms = landms[inds]
                 scores = scores[inds]
 
-                # keep top-K before NMS
+                # keep top-K before NMS 非极大值抑制
                 order = scores.argsort()[::-1][:args.top_k]
                 boxes = boxes[order]
                 landms = landms[order]
@@ -324,7 +342,7 @@ class Fatigue_detecting(wx.Frame):
                 dets = dets[keep, :]
                 landms = landms[keep]
 
-                # keep top-K faster NMS
+                # keep top-K faster NMS 保持top-K检测
                 dets = dets[:args.keep_top_k, :]
                 landms = landms[:args.keep_top_k, :]
 
@@ -335,13 +353,16 @@ class Fatigue_detecting(wx.Frame):
                 #width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
                 #print(width)
                 # show image
+
+     #上面的代码是处理输入图像，通过模型推理生成边界框和人脸关键点，然后通过一系列后处理步骤（如缩放、解码、NMS）来优化检测结果，最后输出前 K
+     # 个检测结果。这是典型的人脸检测工作流程，涉及图像的预处理、模型推理、解码、NMS 等技术。
                 if args.save_image:
                     Face = False
                     Mask = False
-                    for b in dets:                      
-                        if b[4] < args.vis_thres:                          
+                    for b in dets:   #遍历面部框
+                        if b[4] < args.vis_thres:   # 跳过低置信度框
                             continue
-                        Face = True
+                        Face = True   # 如果检测到面部并且通过 inference 函数检测到戴口罩的标志（返回值为 1），则设置 Mask = True
 
                         face_mask_out = inference(img_raw,
                                   conf_thresh=0.8,
@@ -360,7 +381,7 @@ class Fatigue_detecting(wx.Frame):
                             #cv2.circle(img_raw, (b[11], b[12]), 1, (0, 255, 0), 4)
                             #cv2.circle(img_raw, (b[13], b[14]), 1, (255, 0, 0), 4)
                             if Mask:
-                                text = "{:.4f}".format(b[4])
+                                text = "{:.4f}".format(b[4]) #显示置信度
                                 b = list(map(int, b))
                                 #cv2.rectangle(img_raw, (b[0], b[1]), (b[2], b[3]), (0, 0, 255), 2)
                                 cx = b[0]
@@ -396,9 +417,10 @@ class Fatigue_detecting(wx.Frame):
                                 mouth_h = distance_half * 2 + 8
                                 mouth = img_raw[mouth_y:mouth_y + mouth_h , mouth_x:mouth_x + mouth_w]
 
-
+                                #以上代码计算出面部的眼睛和嘴巴的坐标
 
                                 torch.set_grad_enabled(True)
+                                #眼睛检测
                                 if self.blink_checkBox2.GetValue()== True:
                                     left_result = eye_check(left_eye)
                                     right_result = eye_check(right_eye)
@@ -442,9 +464,10 @@ class Fatigue_detecting(wx.Frame):
                                         self.eyetimes += 1
                                         self.alltimes += 1
                                         #print(self.EyeClose)
+                                        #！长时间闭眼警告
                                         if self.EyeClose >= self.LONG_EYE_AR_CONSEC_FRAMES:
                                             if self.long_EyeClose == 0:
-                                                self.long_EyeClose = 1
+                                                self.long_EyeClose+= 1
                                                 self.m_textCtrl3.AppendText(time.strftime('%Y-%m-%d %H:%M ', time.localtime())+u"长时间闭眼\n")
                                         #cv2.putText(img_raw, "Eye Close", (250, 100),
                                         #        cv2.FONT_HERSHEY_DUPLEX, 1, (0, 191, 255),2)
