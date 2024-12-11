@@ -36,7 +36,7 @@ def get_gradcam_image(gcam, raw_image, paper_cmap=False):
         alpha = gcam[..., None]
         gcam = alpha * cmap + (1 - alpha) * raw_image
     else:
-        gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
+        gcam = (cmap.astype(np.float64) + raw_image.astype(np.float64)) / 2
     return np.uint8(gcam)
     
 def guided_backprop_image(img, raw_img, shape, net):
@@ -92,7 +92,7 @@ def eye_check(raw_eye):
 
     
     net = model.Model(num_classes=len(classes))
-    checkpoint = torch.load(os.path.join('D:/吕良伟毕业论文+PPT+算法程序/吕良伟毕业论文+PPT+算法程序/Fatigue Detector/Fatigue_Detector/trained/', model_name), map_location=torch.device('cpu'))
+    checkpoint = torch.load(os.path.join('trained/', model_name), map_location=torch.device('cpu'))
     
     net.load_state_dict(checkpoint['net'])
     net.eval()
@@ -116,7 +116,7 @@ def mouth_check(raw_mouth):
 
     
     net = model.Model(num_classes=len(classes))
-    checkpoint = torch.load(os.path.join('D:/吕良伟毕业论文+PPT+算法程序/吕良伟毕业论文+PPT+算法程序/Fatigue Detector/Fatigue_Detector/trained/', model_name), map_location=torch.device('cpu'))
+    checkpoint = torch.load(os.path.join('trained/', model_name), map_location=torch.device('cpu'))
     
     net.load_state_dict(checkpoint['net'])
     net.eval()
