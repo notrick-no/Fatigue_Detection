@@ -5,6 +5,7 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import argparse
 import torch.utils.data as data
+import matplotlib.pyplot as plt
 from data import WiderFaceDetection, detection_collate, preproc, cfg_mnet, cfg_slim, cfg_rfb
 from layers.modules import MultiBoxLoss
 from layers.functions.prior_box import PriorBox
@@ -14,9 +15,11 @@ import math
 from models.retinaface import RetinaFace
 from models.net_slim import Slim
 from models.net_rfb import RFB
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="Failed to initialize NumPy: _ARRAY_API not found")
 
 parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--training_dataset', default='./data/widerface/train/label.txt', help='Training dataset directory')
+parser.add_argument('--training_dataset', default='./data/widerface/widerface/train/label.txt', help='Training dataset directory')
 parser.add_argument('--network', default='RFB', help='Backbone network mobile0.25 or slim or RFB')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
@@ -99,7 +102,22 @@ with torch.no_grad():
 def train():
     net.train()
     epoch = 0 + args.resume_epoch
+    print('='*50)
+    print(f'Training {args.network} network')
+    print(f'Config: {cfg}')
+    print('='*50)
     print('Loading Dataset...')
+    
+    # Initialize logging
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
+    log_file = open(f'logs/{args.network}_training.log', 'w')
+    
+    # For visualization
+    train_loss = []
+    loc_loss = []
+    cls_loss = []
+    landm_loss = []
 
     dataset = WiderFaceDetection( training_dataset,preproc(img_dim, rgb_mean))
 
@@ -144,9 +162,38 @@ def train():
         load_t1 = time.time()
         batch_time = load_t1 - load_t0
         eta = int(batch_time * (max_iter - iteration))
-        print('Epoch:{}/{} || Epochiter: {}/{} || Iter: {}/{} || Loc: {:.4f} Cla: {:.4f} Landm: {:.4f} || LR: {:.8f} || Batchtime: {:.4f} s || ETA: {}'
+        # Log to file and console
+        log_str = 'Epoch:{}/{} || Epochiter: {}/{} || Iter: {}/{} || Loc: {:.4f} Cla: {:.4f} Landm: {:.4f} || LR: {:.8f} || Batchtime: {:.4f} s || ETA: {}'\
               .format(epoch, max_epoch, (iteration % epoch_size) + 1,
-              epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(), loss_landm.item(), lr, batch_time, str(datetime.timedelta(seconds=eta))))
+              epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(), loss_landm.item(), lr, batch_time, str(datetime.timedelta(seconds=eta)))
+        print(log_str)
+        log_file.write(log_str + '\n')
+        
+        # Collect losses for visualization
+        train_loss.append(loss.item())
+        loc_loss.append(loss_l.item())
+        cls_loss.append(loss_c.item())
+        landm_loss.append(loss_landm.item())
+        
+        # Plot at the end of each epoch
+        if iteration % epoch_size == 0 and iteration > 0:
+            plt.figure(figsize=(12, 6))
+            plt.plot(train_loss, label='Total Loss')
+            plt.plot(loc_loss, label='Localization Loss')
+            plt.plot(cls_loss, label='Classification Loss')
+            plt.plot(landm_loss, label='Landmark Loss')
+            plt.title(f'{args.network} Network Training Loss')
+            plt.xlabel('Iterations')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.savefig(f'logs/{args.network}_epoch_{epoch}_loss.png')
+            plt.close()
+            
+            # Reset for next epoch
+            train_loss = []
+            loc_loss = []
+            cls_loss = []
+            landm_loss = []
 
     torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
 

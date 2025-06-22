@@ -71,7 +71,7 @@ def get_gradcam_image(gcam, raw_image, paper_cmap=False):
         alpha = gcam[..., None]
         gcam = alpha * cmap + (1 - alpha) * raw_image
     else:
-        gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
+        gcam = (cmap.astype(float) + raw_image.astype(float)) / 2
     return np.uint8(gcam)
 
 def guided_backprop_eye(image, name, net):
@@ -109,7 +109,23 @@ def guided_backprop_eye(image, name, net):
     guided_gradcam_image = get_gradient_image(torch.mul(regions, gradients)[0])
     guided_gradcam_image = cv2.merge((guided_gradcam_image, guided_gradcam_image, guided_gradcam_image))
     print(image['path'],classes[actual_status.data], probs.data[:,0] * 100)
+    # Show Guided Backpropagation Image
+    plt.imshow(guided_bpg_image)
+    plt.title("Guided Backpropagation")
+    plt.axis('off')  # Hide axes
+    plt.show()
 
+    # Show Grad-CAM Image
+    plt.imshow(grad_cam_image)
+    plt.title("Grad-CAM")
+    plt.axis('off')  # Hide axes
+    plt.show()
+
+    # Show Guided Grad-CAM Image
+    plt.imshow(guided_gradcam_image)
+    plt.title("Guided Grad-CAM")
+    plt.axis('off')  # Hide axes
+    plt.show()
     return cv2.hconcat(
         [image[name + '_raw'], prob_image, guided_bpg_image, grad_cam_image, guided_gradcam_image])
 

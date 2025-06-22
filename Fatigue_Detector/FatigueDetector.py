@@ -33,7 +33,7 @@ from recognition.check import eye_check, mouth_check
 COVER = './images/shangda8.png'
 
 parser = argparse.ArgumentParser(description='Test')
-parser.add_argument('-m', '--trained_model', default='D:\Fatigue Detector\Fatigue_Detector\weights\mobilenet0.25_Final.pth',
+parser.add_argument('-m', '--trained_model', default='weights\mobilenet0.25_Final.pth',
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or slim or RFB')
 
@@ -90,7 +90,7 @@ def load_model(model, pretrained_path, load_to_cpu):
 
 
 class Fatigue_detecting(wx.Frame):
-    #使用 wxPython 创建图形界面应用程序的代码，主要用于视频流疲劳检测，包括打哈欠、闭眼、离位等功能
+    #使用 wxPython 创建图形界面应用程序的代码
     def __init__( self, parent, title ):
         wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = title, pos = wx.DefaultPosition, size = wx.Size( 873,535 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
                 
@@ -224,7 +224,8 @@ class Fatigue_detecting(wx.Frame):
         #载预训练模型权重（通过 load_model 函数）。
         #设置模型为评估模式（eval()），以关闭 dropout 和 batch normalization 等训练时特有的行为。
         #打印模型结构以及模型加载完成的提示信息。
-        #启用 cuDNN 优化，提升 GPU 上卷积操作的性能（适用于固定输入大小的模型）。
+        #启用 cuDNN 优化，提升 GPU 上卷积操作的性能（适用于固定
+        # 输入大小的模型）。
         #根据 args.cpu 参数选择设备（CPU 或 GPU）。
         #将模型移动到选定的计算设备上。
         net = load_model(net, args.trained_model, args.cpu)
@@ -515,15 +516,29 @@ class Fatigue_detecting(wx.Frame):
 
                                 #if self.blink_count >= 5 or self.yawm_count >= 5 or self.long_EyeClose == 1:
                                  #       cv2.putText(img_raw, "SLEEP!!!", (cx-70, cy-10),cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                                PERCLOS = self.eyetimes/self.alltimes
+                                # PERCLOS(Percentage of Eyelid Closure Over the Pupil)算法实现
+                                # 计算公式：PERCLOS = 眼睑闭合时间 / 总检测时间
+                                # 阈值说明：
+                                # - PERCLOS ≥ 0.15 表示严重疲劳(红色警告)
+                                # - 0.13 ≤ PERCLOS < 0.15 且检测到打哈欠时表示轻度疲劳(红色警告)
+                                # - PERCLOS < 0.13 表示正常状态(黄色显示)
+                                PERCLOS = self.eyetimes/self.alltimes  # 计算眼睑闭合时间占比
+                                
+                                # 显示PERCLOS值(正常状态显示为黄色)
                                 cv2.putText(img_raw, "PERCLOS: {}".format("%.2f" % PERCLOS), (20, 456),
                                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 3)
+                                
+                                # 严重疲劳判断
                                 if PERCLOS >= 0.15:
                                     cv2.putText(img_raw, "PERCLOS: {}".format("%.2f" % PERCLOS), (20, 456),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                                    self.k = 1
+                                    self.k = 1  # 设置疲劳标志位
+                                
+                                # 长时间闭眼判断
                                 if self.long_EyeClose==1:
                                     self.k = 1
+                                
+                                # 轻度疲劳判断(需同时检测到打哈欠)
                                 if PERCLOS >= 0.13 and self.yawm_count!=0:
                                     cv2.putText(img_raw, "PERCLOS: {}".format("%.2f" % PERCLOS), (20, 456),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)

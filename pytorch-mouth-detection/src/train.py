@@ -12,8 +12,8 @@ from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 
 import cv2
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
+# face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+# eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
 if not torch.cuda.is_available():
     from torchsummary import summary
@@ -39,28 +39,26 @@ class DataSetFactory:
 
         files = list(map(lambda x: {'file': x, 'label':1}, glob.glob('../dataset/mouth/resize_open_mouth/*.jpg')))
         files.extend(list(map(lambda x: {'file': x, 'label':0}, glob.glob('../dataset/mouth/resize_closed_mouth/*.jpg'))))
-
         random.shuffle(files)
         for file in files:
             img = cv2.imread(file['file'])
-            images.append(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
-            labels.append(file['label'])
-
+            if img is None:
+                print("No!")
+            else:
+                images.append(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
+                labels.append(file['label'])
         validation_length = int(len(images) * validation_ratio)
         validation_images = images[:validation_length]
         validation_labels = labels[:validation_length]
         images = images[validation_length:]
         labels = labels[validation_length:]
-
         print('training size %d : val size %d' % (len(images), len(validation_images)))
-
         train_transform = transforms.Compose([
             ToTensor(),
         ])
         val_transform = transforms.Compose([
             ToTensor(),
         ])
-
         self.training = DataSet(transform=train_transform, images=images, labels=labels)
         self.validation = DataSet(transform=val_transform, images=validation_images, labels=validation_labels)
 

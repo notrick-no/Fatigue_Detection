@@ -12,13 +12,13 @@ from torchvision import transforms
 from torchsummary import summary
 from grad_cam import BackPropagation, GradCAM,GuidedBackPropagation
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml') #创建人脸检测的对象
 shape = (24,24)
 classes = [
     'Close',
     'Open',
 ]
-
+#调用face_cascade检测人脸,提取面部和眼睛的区域，转化为张量
 def preprocess(image_path):
     transform_test = transforms.Compose([
         transforms.ToTensor()
@@ -55,15 +55,17 @@ def preprocess(image_path):
                transform_test(Image.fromarray(right_eye).convert('L')), \
                left_eye, right_eye, cv2.resize(face, (48,48))
 
-
+#这段代码将梯度图像处理成一个 8 位、归一化的图像，以便进行可视化
 def get_gradient_image(gradient):
     gradient = gradient.cpu().numpy().transpose(1, 2, 0)
     gradient -= gradient.min()
     gradient /= gradient.max()
     gradient *= 255.0
+    # plt.imshow(np.uint8(gradient))
+    # plt.show()
     return np.uint8(gradient)
 
-
+#这段代码是用来生成 Grad-CAM（梯度加权类激活映射） 图像的，目的是通过可视化模型关注的区域，帮助解释神经网络的决策过程。具体来说，get_gradcam_image 函数将原始图像和 Grad-CAM 的激活图（通常是梯度图）合成，以生成一个直观的可视化效果。
 def get_gradcam_image(gcam, raw_image, paper_cmap=False):
     gcam = gcam.cpu().numpy()
     cmap = cm.jet_r(gcam)[..., :3] * 255.0
@@ -71,8 +73,11 @@ def get_gradcam_image(gcam, raw_image, paper_cmap=False):
         alpha = gcam[..., None]
         gcam = alpha * cmap + (1 - alpha) * raw_image
     else:
-        gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
+        gcam = (cmap.astype(float) + raw_image.astype(float)) / 2
     return np.uint8(gcam)
+
+
+
 '''
 def guided_backprop_eye(image, name, net):
     img = torch.stack([image[name]])
@@ -112,7 +117,7 @@ def guided_backprop_eye(image, name, net):
 
     return cv2.hconcat(
         [image[name + '_raw'], prob_image, guided_bpg_image, grad_cam_image, guided_gradcam_image])'''
-        
+# 这段代码的作用是结合 Grad-CAM 和 Guided Backpropagation 方法，通过神经网络的反向传播和类激活映射技术来可视化模型对输入图像的关注区域，特别是对眼睛图像的分析。
 def guided_backprop_eye(eye, raw_eye, net):
     img = torch.stack([eye])
     bp = BackPropagation(model=net)
@@ -149,6 +154,23 @@ def guided_backprop_eye(eye, raw_eye, net):
     guided_gradcam_image = cv2.merge((guided_gradcam_image, guided_gradcam_image, guided_gradcam_image))
     print(classes[actual_status.data]) #, probs.data[:,0] * 100
 
+    # Show Guided Backpropagation Image
+    plt.imshow(guided_bpg_image)
+    plt.title("Guided Backpropagation")
+    plt.axis('off')  # Hide axes
+    plt.show()
+
+    # Show Grad-CAM Image
+    plt.imshow(grad_cam_image)
+    plt.title("Grad-CAM")
+    plt.axis('off')  # Hide axes
+    plt.show()
+
+    # Show Guided Grad-CAM Image
+    plt.imshow(guided_gradcam_image)
+    plt.title("Guided Grad-CAM")
+    plt.axis('off')  # Hide axes
+    plt.show()
     return actual_status.data
 
 '''
@@ -211,7 +233,7 @@ def guided_backprop(raw_eye, model_name):
 def main():
     image = cv2.imread('right_eye_open.jpg')
     model_name='model_5_94_0.1760.t7'
-    
+
     guided_backprop(image,model_name)
     '''
     guided_backprop(
@@ -223,7 +245,6 @@ def main():
         ],
         model_name='model_5_94_0.1760.t7'
     )'''
-
 
 if __name__ == "__main__":
     main()

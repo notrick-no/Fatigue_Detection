@@ -66,34 +66,45 @@ class SSH(nn.Module):
         return out
 
 class FPN(nn.Module):
+    """特征金字塔网络(FPN)实现
+    通过自顶向下的路径和横向连接，构建具有丰富语义信息的特征金字塔
+    能够在不同尺度上检测不同大小的目标
+    """
     def __init__(self,in_channels_list,out_channels):
         super(FPN,self).__init__()
         leaky = 0
         if (out_channels <= 64):
             leaky = 0.1
-        self.output1 = conv_bn1X1(in_channels_list[0], out_channels, stride = 1)
-        self.output2 = conv_bn1X1(in_channels_list[1], out_channels, stride = 1)
-        self.output3 = conv_bn1X1(in_channels_list[2], out_channels, stride = 1)
+        # 1x1卷积层，用于调整不同层级特征的通道数
+        self.output1 = conv_bn1X1(in_channels_list[0], out_channels, stride = 1)  # P3层级
+        self.output2 = conv_bn1X1(in_channels_list[1], out_channels, stride = 1)  # P4层级
+        self.output3 = conv_bn1X1(in_channels_list[2], out_channels, stride = 1)  # P5层级
 
-        self.merge1 = conv_bn(out_channels, out_channels)
-        self.merge2 = conv_bn(out_channels, out_channels)
+        # 3x3卷积层，用于特征融合后的处理
+        self.merge1 = conv_bn(out_channels, out_channels)  # 用于P3层级的融合特征
+        self.merge2 = conv_bn(out_channels, out_channels)  # 用于P4层级的融合特征
 
     def forward(self, input):
-        # names = list(input.keys())
+        # 获取主干网络输出的多层级特征
         input = list(input.values())
 
-        output1 = self.output1(input[0])
-        output2 = self.output2(input[1])
-        output3 = self.output3(input[2])
+        # 第一步：使用1x1卷积统一所有层级特征的通道数
+        output1 = self.output1(input[0])  # P3层级特征(最高分辨率)
+        output2 = self.output2(input[1])  # P4层级特征
+        output3 = self.output3(input[2])  # P5层级特征(最低分辨率)
 
+        # 第二步：自顶向下的特征融合
+        # 1. 将P5层特征上采样到P4层分辨率并相加
         up3 = F.interpolate(output3, size=[output2.size(2), output2.size(3)], mode="nearest")
-        output2 = output2 + up3
-        output2 = self.merge2(output2)
+        output2 = output2 + up3  # 特征相加
+        output2 = self.merge2(output2)  # 3x3卷积处理融合后的特征
 
+        # 2. 将P4层特征上采样到P3层分辨率并相加
         up2 = F.interpolate(output2, size=[output1.size(2), output1.size(3)], mode="nearest")
-        output1 = output1 + up2
-        output1 = self.merge1(output1)
+        output1 = output1 + up2  # 特征相加
+        output1 = self.merge1(output1)  # 3x3卷积处理融合后的特征
 
+        # 返回构建好的特征金字塔[P3, P4, P5]
         out = [output1, output2, output3]
         return out
 

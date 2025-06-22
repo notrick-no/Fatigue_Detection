@@ -10,7 +10,7 @@ from models.net_rfb import RFB
 
 parser = argparse.ArgumentParser(description='Test')
 parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or slim or RFB')
-parser.add_argument('--long_side', default=320, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
+parser.add_argument('--long_side', default=320, type=int, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
 
 args = parser.parse_args()
 
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     
     flops, params = clever_format([flops, params], "%.3f")
     print("param:", params, "flops:", flops)
+
 
 
 

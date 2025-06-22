@@ -73,7 +73,7 @@ def _crop(image, boxes, labels, landm, img_dim):
 
         return image_t, boxes_t, labels_t, landms_t, pad_image_flag
     return image, boxes, labels, landm, pad_image_flag
-
+#基于随机缩放来裁剪图像，确保裁剪后的区域包含至少一个面部或感兴趣的区域，并相应地调整边界框（bounding box）和关键点（landmarks）。
 
 def _distort(image):
 
@@ -134,7 +134,7 @@ def _distort(image):
             _convert(image, alpha=random.uniform(0.5, 1.5))
 
     return image
-
+# 通过对图像的亮度、对比度、饱和度和色相进行随机增强来扩充数据集，增加图像的多样性，从而提高训练模型的泛化能力。每个增强操作都有 50% 的概率被应用，并且亮度、对比度、饱和度、色相的调整都是在一定范围内随机变化。通过这些增强，模型可以更好地适应不同的图像条件。
 
 def _expand(image, boxes, fill, p):
     if random.randrange(2):
@@ -160,7 +160,7 @@ def _expand(image, boxes, fill, p):
     image = expand_image
 
     return image, boxes_t
-
+# 图像的随机扩展（padding）
 
 def _mirror(image, boxes, landms):
     _, width, _ = image.shape
@@ -182,7 +182,7 @@ def _mirror(image, boxes, landms):
         landms = landms.reshape([-1, 10])
 
     return image, boxes, landms
-
+#这段代码的目的是对图像进行镜像翻转处理，并相应地调整图像中的框（boxes）和关键点（landms）。
 
 def _pad_to_square(image, rgb_mean, pad_image_flag):
     if not pad_image_flag:
@@ -193,7 +193,7 @@ def _pad_to_square(image, rgb_mean, pad_image_flag):
     image_t[:, :] = rgb_mean
     image_t[0:0 + height, 0:0 + width] = image
     return image_t
-
+#这个函数的作用是将输入图像填充为正方形，并使用指定的RGB均值填充空白区域。
 
 def _resize_subtract_mean(image, insize, rgb_mean):
     interp_methods = [cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_NEAREST, cv2.INTER_LANCZOS4]

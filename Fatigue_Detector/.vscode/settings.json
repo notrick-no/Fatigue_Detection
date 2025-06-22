@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "chrono": "cpp",
+        "istream": "cpp",
+        "stack": "cpp",
+        "string": "cpp",
+        "deque": "cpp",
+        "vector": "cpp"
+    }
+}

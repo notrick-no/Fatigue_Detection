@@ -80,7 +80,7 @@ if __name__ == '__main__':
     elif args.network == "slim":
         cfg = cfg_slim
         net = Slim(cfg = cfg, phase = 'test')
-    elif args.network == "RFB":
+    elif args.network == "RBF":
         cfg = cfg_rfb
         net = RFB(cfg = cfg, phase = 'test')
     else:

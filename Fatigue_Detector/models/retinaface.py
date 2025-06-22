@@ -71,13 +71,17 @@ class RetinaFace(nn.Module):
 
         self.body = _utils.IntermediateLayerGetter(backbone, cfg['return_layers'])
         in_channels_stage2 = cfg['in_channel']
+        # 定义不同层级特征的输入通道数
         in_channels_list = [
-            in_channels_stage2 * 2,
-            in_channels_stage2 * 4,
-            in_channels_stage2 * 8,
+            in_channels_stage2 * 2,  # P3层级的输入通道数(较高分辨率)
+            in_channels_stage2 * 4,  # P4层级的输入通道数(中等分辨率)
+            in_channels_stage2 * 8,  # P5层级的输入通道数(较低分辨率)
         ]
         out_channels = cfg['out_channel']
-        self.fpn = FPN(in_channels_list,out_channels)
+        # 初始化特征金字塔网络(FPN)
+        # FPN接收来自主干网络的多层级特征，构建具有丰富语义信息的特征金字塔
+        # 能够在不同尺度上检测不同大小的目标
+        self.fpn = FPN(in_channels_list, out_channels)
         self.ssh1 = SSH(out_channels, out_channels)
         self.ssh2 = SSH(out_channels, out_channels)
         self.ssh3 = SSH(out_channels, out_channels)
