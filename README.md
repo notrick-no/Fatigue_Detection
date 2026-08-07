@@ -1,38 +1,133 @@
-# Fatigue_Detection
+# Fatigue_Detection — 疲劳驾驶实时检测系统
 
-### **主要知识点：**
+> 基于 RetinaFace + 自定义 CNN + PERCLOS 算法的三级疲劳检测管线。
 
-1. **计算机视觉与图像处理**
-   - **OpenCV**：用于图像的读取、处理和显示。包括图像的缩放、裁剪、颜色空间转换、面部检测框架的绘制等。
-   - **人脸检测**：使用如 `RetinaFace` 或类似的人脸检测算法来识别图像中的人脸和面部特征点。能够检测到眼睛、嘴巴、鼻子等关键区域。
-   - **目标检测与定位**：通过检测框定位人脸并提取关键点（如眼睛、嘴巴等），进行后续分析。
-2. **深度学习**
-   - **卷积神经网络（CNN）**：作为底层的深度学习模型，用于图像特征的提取。模型可能通过 `RetinaFace` 或类似的模型来完成。
-   - **眼睛状态检测（眨眼检测）**：基于眼部特征点（眼睛的左右眼睛区域）来判断眨眼状态。这通常是基于脸部检测模型和眼睛闭合程度（例如通过计算眼睛长宽比）来实现。
-   - **面部特征点定位**：通过深度学习模型检测面部的多个关键点（如眼睛、嘴巴、鼻尖等），用于进一步判断疲劳状态（如闭眼、打哈欠等）。
-   - **神经网络推理**：模型加载、推理过程（例如 `torch.load()` 和 `net.eval()`），以及后处理（如解码、非极大值抑制 NMS）。
-3. **疲劳驾驶识别**
-   - **PERCLOS（闭眼率）**：是用于衡量疲劳驾驶的一种指标，计算闭眼时间占总观察时间的比例。这个是疲劳驾驶检测中的核心内容之一。
-   - **疲劳检测策略**：基于闭眼、眨眼、长时间闭眼等因素进行疲劳评估。通常结合眼睛的状态和长时间闭眼等行为判断是否存在疲劳驾驶的风险。
-   - **打哈欠检测**（如果有的话）：通过嘴巴和眼睛的动作判断是否出现打哈欠等疲劳的行为。
-4. **实时系统设计**
-   - **多线程与异步处理**：项目中涉及实时图像处理，使用多线程处理后台任务（如模型推理）而不阻塞前台UI显示。需要理解如何使用 `threading` 或 `asyncio` 来处理多任务。
-   - **图像流处理**：使用如摄像头等实时数据源，保证检测系统能够在实时视频流中检测并更新疲劳信息。
+[![Python](https://img.shields.io/badge/Python-3.8+-blue)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-red)](https://pytorch.org)
+[![ONNX](https://img.shields.io/badge/ONNX-export-brightgreen)](https://onnx.ai)
 
-### **次要知识点：**
+## 概述
 
-1. **深度学习框架**
-   - **PyTorch**：模型的训练、推理以及相关操作（如 `torch.set_grad_enabled(False)` 用于冻结计算图，减少不必要的计算）。理解如何使用 PyTorch 进行模型加载、推理、数据预处理和结果后处理。
-   - **迁移学习**：可以基于预训练的模型（如 `RetinaFace`）进行微调，以适应特定的应用场景和数据集。
-2. **优化与性能**
-   - **NMS（非极大值抑制）**：在目标检测中，NMS 用于筛选最优的检测框，避免多个重叠的框。需要理解如何在实时检测中使用和优化 NMS。
-   - **模型加速**：如使用 CUDA、`torch.cuda` 来加速推理过程，以及处理不同硬件环境（如 CPU 和 GPU）下的性能差异。
-   - **内存管理与计算图管理**：理解如何在 PyTorch 中管理内存，避免不必要的内存消耗，特别是在实时处理时。
-3. **人机交互**
-   - **GUI 界面设计**：如果涉及图形界面（如 `wxPython`、`PyQt` 或其他框架），理解如何设计和实现界面组件来显示实时检测结果、疲劳警告等信息。
-   - **事件驱动编程**：如何响应用户交互（例如按钮点击）来启动后台任务或调整参数。
-4. **定时与计时功能**
-   - **时间管理与周期性任务**：使用 `time` 模块进行时间戳计算，周期性重置计数器等功能，确保实时监控的准确性和可靠性。
-5. **模型调优与评估**
-   - **过拟合与正则化**：在训练模型时，如何使用合适的正则化方法（如 dropout、数据增强等）来避免过拟合，尤其是在小数据集上进行训练时。
-   - **模型评估与调试**：如何评估训练好的模型性能，调整网络参数以提高准确率，解决误报或漏报问题。
+深度学习疲劳驾驶检测系统，用于车载场景下的驾驶员状态实时监控。通过三级管线实现从人脸检测到疲劳判定的全流程。
+
+## 架构
+
+```
+摄像头 → 人脸检测 (RetinaFace) → 疲劳特征提取 (自定义 CNN) → 疲劳判定 (PERCLOS)
+```
+
+### 三级检测管线
+
+| 阶段 | 模型 | 输出 |
+|------|------|------|
+| 1. 人脸检测 | RetinaFace (mobile0.25/Slim/RFB) | 人脸框 + 5 关键点 |
+| 2. 特征提取 | 自定义 CNN（SeparableConv2d + ResidualBlock） | 眼睛开闭 + 嘴巴开闭 |
+| 3. 疲劳判定 | PERCLOS 算法 + 多维度加权 | 疲劳/清醒 + 置信度 |
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 人脸检测 | RetinaFace 全流程手写（config/data/prior box/decode/NMS） |
+| 特征提取 | 自定义轻量 CNN（SeparableConv2d + ResidualBlock，单通道输入） |
+| 疲劳判定 | PERCLOS + 打哈欠检测 + 离位检测 → 加权判定 |
+| 可视化 | Grad-CAM 热力图 + ROC 曲线 |
+| 模型优化 | ONNX 导出 + FLOPs 计算 |
+| GUI | wxPython 实时检测界面 |
+
+## 快速开始
+
+```bash
+pip install -r requirements.txt
+cd Fatigue_Detector
+python FatigueDetector.py
+```
+
+## 项目结构
+
+```
+Fatigue_Detector/
+├── FatigueDetector.py       # 主入口 + wxPython GUI
+├── model.py                 # 模型组装
+├── train.py                 # RetinaFace 训练
+├── test.py                  # WIDERFace 测试
+├── test_widerface.py        # WIDERFace 评估
+├── convert_to_onnx.py       # ONNX 导出
+├── calculate_paremeter_flop.py  # FLOPs 计算
+├── plot_roc_curves.py       # ROC 评估
+├── data/                    # 数据处理
+│   ├── config.py            # 配置管理
+│   ├── data_augment.py      # 数据增强
+│   └── wider_face.py        # WIDERFace 数据集
+├── layers/
+│   ├── functions/prior_box.py   # PriorBox 生成
+│   └── modules/multibox_loss.py # MultiBoxLoss
+├── load_model/              # MXNet → PyTorch 权重迁移
+│   ├── MainModel.py
+│   ├── mxnet_loader.py
+│   ├── mxnet_model_structure.py
+│   └── pytorch_loader.py
+├── models/                  # RetinaFace 变体
+│   ├── retinaface.py        # 基础版
+│   ├── net.py               # MobileNet0.25
+│   ├── net_slim.py          # Slim 轻量版
+│   └── net_rfb.py           # RFB 版（Receptive Field Block）
+├── recognition/             # 疲劳识别 CNN
+│   ├── train.py             # CNN 训练
+│   ├── check.py             # 模型验证
+│   └── grad_cam.py          # Grad-CAM 可视化
+└── utils/                   # 工具函数
+    ├── anchor_generator.py  # Anchor 生成
+    ├── anchor_decode.py     # Anchor 解码
+    ├── box_utils.py         # BBox 工具
+    ├── nms.py               # GPU NMS
+    ├── py_cpu_nms.py        # CPU NMS
+    └── timer.py             # 计时工具
+
+pytorch-eyeblink-detection/  # 眨眼检测模块
+└── src/ (model.py, train.py, check.py, grad_cam.py)
+
+pytorch-mouth-detection/     # 嘴部检测模块
+└── src/ (model.py, train.py, check.py, grad_cam.py, mouth_check.py)
+```
+
+## RetinaFace 实现要点
+
+本项目是 RetinaFace 的**全流程手写实现**（非 API 调包）：
+
+- **PriorBox 生成**：多尺度 anchor，针对人脸比例优化
+- **MultiBoxLoss**：分类 + 回归 + 关键点联合损失
+- **Decode & NMS**：anchor 解码 + 非极大值抑制后处理
+- **多模型变体**：MobileNet0.25 / Slim / RFB 三种 backbone
+- **权重迁移**：MXNet → PyTorch 权重转换脚本
+
+## 疲劳判定逻辑
+
+### PERCLOS (Percentage of Eye Closure)
+
+```
+PERCLOS = 闭眼帧数 / 总帧数 × 100%
+疲劳阈值：PERCLOS > 20%
+```
+
+### 多维度加权判定
+
+| 指标 | 权重 | 说明 |
+|------|------|------|
+| PERCLOS | 高 | 核心指标，眼睑闭合比例 |
+| 打哈欠频率 | 中 | 嘴部开合检测 |
+| 离位检测 | 低 | 驾驶员面部偏离画面 |
+
+## 模型变体
+
+| 模型 | Backbone | 适用场景 |
+|------|----------|---------|
+| mobile0.25 | MobileNet 0.25× | 移动端 / 嵌入式 |
+| Slim | 轻量化设计 | 边缘设备 |
+| RFB | Receptive Field Block | 精度优先 |
+
+支持 ONNX 导出用于生产部署。
+
+## License
+
+MIT
